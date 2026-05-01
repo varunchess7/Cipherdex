@@ -78,6 +78,12 @@ def list():
     for cipher_name in CIPHERS:
         print(f"- {cipher_name}")
 
+@app.command()
+def analyze(algo: str = typer.Option(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)")):
+    if algo == "caesar":
+        print("[bold cyan]This cipher shifts every letter in the text by the key given.[/bold cyan]")
+    else:
+        print("[bold cyan]Other ciphers coming soon[/bold cyan]")
 
 # ---------- ENCRYPT COMMAND ----------
 
