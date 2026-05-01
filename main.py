@@ -1,6 +1,7 @@
 import typer
 from rich import print
 from ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
+from analyze_ciphers import cipherinfo
 
 app = typer.Typer()
 
@@ -80,10 +81,8 @@ def list():
 
 @app.command()
 def analyze(algo: str = typer.Option(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)")):
-    if algo == "caesar":
-        print("[bold cyan]This cipher shifts every letter in the text by the key given.[/bold cyan]")
-    else:
-        print("[bold cyan]Other ciphers coming soon[/bold cyan]")
+    info = cipherinfo.get(algo)
+    print(f"[bold cyan]{info}[/bold cyan]")
 
 # ---------- ENCRYPT COMMAND ----------
 
