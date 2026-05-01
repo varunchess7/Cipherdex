@@ -2,6 +2,7 @@ import typer
 from rich import print
 from ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
 from analyze_ciphers import cipherinfo
+from collections import Counter
 
 app = typer.Typer()
 
@@ -80,9 +81,56 @@ def list():
         print(f"- {cipher_name}")
 
 @app.command()
-def analyze(algo: str = typer.Option(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)")):
+def analyze(algo: str = typer.Argument(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)")):
     info = cipherinfo.get(algo)
     print(f"[bold cyan]{info}[/bold cyan]")
+
+@app.command()
+def bruteforce(text: str = typer.Argument(..., help="Text to encrypt")):
+    key = 1
+    for i in range(25):
+        print(f"key={key}", caesar_cipher(text, -key))
+        key += 1
+
+@app.command()
+def frequency(text):
+    freq = Counter(char.lower() for char in text if char.isalpha())
+    
+    for letter, count in freq.items():
+        print(f"{letter}: {count}")
+
+
+@app.command()
+def interactive():
+    print("[bold cyan]Cryptic Interactive Mode[/bold cyan]")
+    print("Available ciphers:")
+
+    for cipher_name in CIPHERS:
+        print(f"- {cipher_name}")
+
+    algo = typer.prompt("Choose cipher").lower()
+    if algo not in CIPHERS:
+        print(f"[bold red]Error:[/bold red] Unknown algorithm '{algo}'")
+        raise typer.Exit()
+
+    mode = typer.prompt("Encrypt or decrypt").lower()
+    if mode not in ["encrypt", "decrypt"]:
+        print("[bold red]Error:[/bold red] Mode must be encrypt or decrypt")
+        raise typer.Exit()
+
+    text = typer.prompt("Enter text")
+    key = ""
+    key2 = ""
+
+    if CIPHERS[algo]["needs_key"]:
+        key = typer.prompt("Enter key")
+
+    if algo == "affine":
+        key2 = typer.prompt("Enter second key")
+
+    result = run_cipher(algo, text, key, key2, mode)
+    print(f"[bold green]Result:[/bold green] {result}")
+
 
 # ---------- ENCRYPT COMMAND ----------
 
