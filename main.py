@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Optional
+
 import typer
 from rich import print
 from ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
@@ -72,6 +75,29 @@ def run_cipher(algo: str, text: str, key: str, key2: str, mode: str):
         raise typer.Exit()
 
 
+def get_input_text(text: str, input_file: Optional[Path]):
+    if input_file:
+        return input_file.read_text(encoding="utf-8")
+
+    if not text:
+        print("[bold red]Error:[/bold red] Enter text or use --file")
+        raise typer.Exit()
+
+    return text
+
+
+def show_output(result: str, output_file: Optional[Path], label: str):
+    if output_file:
+        output_file.write_text(result, encoding="utf-8")
+        print(f"[bold green]Saved:[/bold green] {output_file}")
+    else:
+        print(f"[bold green]{label}:[/bold green] {result}")
+
+
+def encrypted_file_name(input_file: Path):
+    return input_file.with_name(f"Encrypted {input_file.name}")
+
+
 @app.command()
 def list():
 
@@ -112,6 +138,9 @@ def interactive():
     if algo not in CIPHERS:
         print(f"[bold red]Error:[/bold red] Unknown algorithm '{algo}'")
         raise typer.Exit()
+    
+    if algo in ["caesar", "rot13", "atbash"]:
+        print("[yellow]Warning: This cipher is not secure[/yellow]")
 
     mode = typer.prompt("Encrypt or decrypt").lower()
     if mode not in ["encrypt", "decrypt"]:
@@ -137,16 +166,23 @@ def interactive():
 @app.command()
 def encrypt(
     algo: str = typer.Option(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)"),
-    text: str = typer.Argument(..., help="Text to encrypt"),
+    text: str = typer.Argument("", help="Text to encrypt"),
     key: str = typer.Option("", help="Key (required for Caesar, Vigenere, Affine, Playfair, and Rail Fence)"),
-    key2: str = typer.Option("", help="Second Key for Affine Cipher")
+    key2: str = typer.Option("", help="Second Key for Affine Cipher"),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read text from a file"),
+    output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Save result to a file")
 ):
     """
     Encrypt text using selected cipher.
     """
 
+    text = get_input_text(text, input_file)
     result = run_cipher(algo, text, key, key2, "encrypt")
-    print(f"[bold green]Encrypted:[/bold green] {result}")
+
+    if input_file and output_file is None:
+        output_file = encrypted_file_name(input_file)
+
+    show_output(result, output_file, "Encrypted")
 
 
 # ---------- DECRYPT COMMAND (you will add logic later) ----------
@@ -154,16 +190,19 @@ def encrypt(
 @app.command()
 def decrypt(
     algo: str = typer.Option(..., help="Cipher algorithm"),
-    text: str = typer.Argument(..., help="Text to decrypt"),
+    text: str = typer.Argument("", help="Text to decrypt"),
     key: str = typer.Option("", help="Key (if needed)"),
-    key2: str = typer.Option("", help="Second Key for Affine Cipher")
+    key2: str = typer.Option("", help="Second Key for Affine Cipher"),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read text from a file"),
+    output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Save result to a file")
 ):
     """
     Decrypt text using selected cipher.
     """
 
+    text = get_input_text(text, input_file)
     result = run_cipher(algo, text, key, key2, "decrypt")
-    print(f"[bold green]Decrypted:[/bold green] {result}")
+    show_output(result, output_file, "Decrypted")
 
 
 # ---------- ENTRY ----------
