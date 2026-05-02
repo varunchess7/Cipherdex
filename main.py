@@ -3,11 +3,14 @@ from typing import Optional
 
 import typer
 from rich import print
+from rich.table import Table
 from ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
 from analyze_ciphers import cipherinfo
 from collections import Counter
 
-app = typer.Typer()
+app = typer.Typer(
+    help="Encrypt, decrypt, inspect, and analyze text with classic cipher algorithms."
+)
 
 CIPHERS = {
     "caesar": {
@@ -98,8 +101,45 @@ def encrypted_file_name(input_file: Path):
     return input_file.with_name(f"Encrypted {input_file.name}")
 
 
+def index_of_coincidence(freq: Counter, total: int):
+    if total < 2:
+        return 0
+
+    matches = sum(count * (count - 1) for count in freq.values())
+    possible_pairs = total * (total - 1)
+    return matches / possible_pairs
+
+
+def guess_cipher_from_ioc(ioc: float, total: int):
+    if total < 20:
+        return "Text is very short, so the guess is weak."
+
+    if ioc >= 0.055:
+        return (
+            "Looks English-like or frequency-preserving. It could be plain English, "
+            "Caesar, Atbash, Affine, Rail Fence, or another substitution/transposition cipher."
+        )
+
+    if ioc >= 0.045:
+        return (
+            "Looks somewhat English-like, but not clear. It may be short text, mixed text, "
+            "or a cipher that only partly hides letter frequency."
+        )
+
+    if ioc >= 0.035:
+        return (
+            "Looks flatter than normal English. It could be Vigenere, Playfair, "
+            "or another cipher that spreads out letter frequencies."
+        )
+
+    return "Looks very flat/random. It may be strongly encrypted, random text, or not English."
+
+
 @app.command()
 def list():
+    """
+    Show all cipher algorithms supported by this tool.
+    """
 
     print("[bold cyan]Available ciphers:[/bold cyan]")
 
@@ -107,27 +147,79 @@ def list():
         print(f"- {cipher_name}")
 
 @app.command()
-def analyze(algo: str = typer.Argument(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)")):
+def info(
+    algo: str = typer.Argument(
+        ...,
+        help="Cipher to explain. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence."
+    )
+):
+    """
+    Explain what a cipher does and how it works.
+    """
     info = cipherinfo.get(algo)
     print(f"[bold cyan]{info}[/bold cyan]")
 
+
 @app.command()
-def bruteforce(text: str = typer.Argument(..., help="Text to encrypt")):
+def bruteforce(
+    text: str = typer.Argument(..., help="Caesar-encrypted text to try every possible shift against.")
+):
+    """
+    Try all Caesar cipher shifts from key 1 to key 25.
+    """
     key = 1
     for i in range(25):
         print(f"key={key}", caesar_cipher(text, -key))
         key += 1
 
 @app.command()
-def frequency(text):
+def analyze(
+    text: str = typer.Argument(..., help="Text to analyze for letter frequency and cipher clues.")
+):
+    """
+    Show letter frequency, Index of Coincidence, and a simple cipher guess.
+    """
     freq = Counter(char.lower() for char in text if char.isalpha())
-    
-    for letter, count in freq.items():
-        print(f"{letter}: {count}")
+    total = sum(freq.values())
+
+    if total == 0:
+        print("[bold red]Error:[/bold red] Text must contain at least one letter")
+        raise typer.Exit()
+
+    table = Table(title="Letter Frequency")
+    table.add_column("Letter", style="cyan", justify="center")
+    table.add_column("Bar", justify="left")
+    table.add_column("Count", style="green", justify="right")
+    table.add_column("Percent", style="yellow", justify="right")
+
+    bar_width = 30
+
+    for letter, count in freq.most_common():
+        percent = (count / total) * 100
+        bar_length = round((percent / 100) * bar_width)
+        bar = "#" * bar_length
+        table.add_row(letter, f"[white]{bar}[/white]", str(count), f"{percent:.2f}%")
+
+    print(table)
+
+    ioc = index_of_coincidence(freq, total)
+    guess = guess_cipher_from_ioc(ioc, total)
+
+    summary = Table(title="Cipher Guess")
+    summary.add_column("Metric", style="cyan")
+    summary.add_column("Value", style="green")
+    summary.add_row("Letters analyzed", str(total))
+    summary.add_row("Index of Coincidence", f"{ioc:.4f}")
+    summary.add_row("Guess", guess)
+
+    print(summary)
 
 
 @app.command()
 def interactive():
+    """
+    Start a prompt-based mode for choosing a cipher and entering text.
+    """
     print("[bold cyan]Cryptic Interactive Mode[/bold cyan]")
     print("Available ciphers:")
 
@@ -165,15 +257,26 @@ def interactive():
 
 @app.command()
 def encrypt(
-    algo: str = typer.Option(..., help="Cipher algorithm (caesar, rot13, atbash, vigenere, affine, playfair, railfence)"),
-    text: str = typer.Argument("", help="Text to encrypt"),
-    key: str = typer.Option("", help="Key (required for Caesar, Vigenere, Affine, Playfair, and Rail Fence)"),
-    key2: str = typer.Option("", help="Second Key for Affine Cipher"),
-    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read text from a file"),
-    output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Save result to a file")
+    algo: str = typer.Option(
+        ...,
+        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence."
+    ),
+    text: str = typer.Argument("", help="Text to encrypt. Optional if --file is used."),
+    key: str = typer.Option(
+        "",
+        help="Main key. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words."
+    ),
+    key2: str = typer.Option("", help="Second numeric key. Required only for affine."),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read plaintext from a file instead of TEXT."),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Save encrypted text to this file. With --file, defaults to 'Encrypted <filename>'."
+    )
 ):
     """
-    Encrypt text using selected cipher.
+    Encrypt typed text or a file using the selected cipher.
     """
 
     text = get_input_text(text, input_file)
@@ -189,15 +292,21 @@ def encrypt(
 
 @app.command()
 def decrypt(
-    algo: str = typer.Option(..., help="Cipher algorithm"),
-    text: str = typer.Argument("", help="Text to decrypt"),
-    key: str = typer.Option("", help="Key (if needed)"),
-    key2: str = typer.Option("", help="Second Key for Affine Cipher"),
-    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read text from a file"),
-    output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Save result to a file")
+    algo: str = typer.Option(
+        ...,
+        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence."
+    ),
+    text: str = typer.Argument("", help="Text to decrypt. Optional if --file is used."),
+    key: str = typer.Option(
+        "",
+        help="Main key used during encryption. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words."
+    ),
+    key2: str = typer.Option("", help="Second numeric key. Required only for affine."),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read ciphertext from a file instead of TEXT."),
+    output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Save decrypted text to this file.")
 ):
     """
-    Decrypt text using selected cipher.
+    Decrypt typed text or a file using the selected cipher.
     """
 
     text = get_input_text(text, input_file)
