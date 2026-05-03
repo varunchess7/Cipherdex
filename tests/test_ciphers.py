@@ -1,3 +1,4 @@
+import base64
 import pytest
 
 from cipherdex.ciphers import (
@@ -8,6 +9,15 @@ from cipherdex.ciphers import (
     rail_fence_cipher,
     rot13_cipher,
     vigenere_cipher,
+)
+from cipherdex.moderncrypto import (
+    aes_decrypt,
+    aes_encrypt,
+    export_private_key,
+    export_public_key,
+    generate_rsa_private_key,
+    rsa_decrypt,
+    rsa_encrypt,
 )
 
 
@@ -66,3 +76,21 @@ def test_rail_fence_cipher_encrypts_and_decrypts():
 
     assert encrypted == "WECRLTEERDSOEEFEAOCAIVDEN"
     assert rail_fence_cipher(encrypted, 3, decrypt=True) == "WEAREDISCOVEREDFLEEATONCE"
+
+
+def test_aes_encrypts_and_decrypts():
+    key = base64.b64encode(b"0123456789abcdef0123456789abcdef").decode("utf-8")
+    encrypted = aes_encrypt(key, "hello world")
+
+    assert encrypted != "hello world"
+    assert aes_decrypt(key, encrypted) == "hello world"
+
+
+def test_rsa_encrypts_and_decrypts():
+    private_key = generate_rsa_private_key()
+    private_pem = export_private_key(private_key).decode("utf-8")
+    public_pem = export_public_key(private_key.public_key()).decode("utf-8")
+
+    encrypted = rsa_encrypt(public_pem, "hello world")
+    assert encrypted != "hello world"
+    assert rsa_decrypt(private_pem, encrypted) == "hello world"

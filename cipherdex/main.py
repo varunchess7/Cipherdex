@@ -7,6 +7,7 @@ from rich import print
 from rich.table import Table
 from cipherdex.ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
 from cipherdex.analyze_ciphers import cipherinfo
+from cipherdex import moderncrypto
 from collections import Counter
 
 app = typer.Typer(
@@ -19,6 +20,8 @@ app = typer.Typer(
         "`--file PATH` reads from a file. "
         "`--output PATH` saves to a file. "
         "`analyze --file PATH` analyzes a file. "
+        "`generate-key --algo aes` generates an AES key. "
+        "`generate-key --algo rsa` generates RSA key pair. "
         "**Examples:** "
         "`cipherdex encrypt --algo caesar --key 3 \"hello\"`; "
         "`cipherdex encrypt --algo caesar --key 3 --file message.txt`; "
@@ -64,10 +67,29 @@ CIPHERS = {
         "encrypt": lambda text, key: rail_fence_cipher(text, int(key)),
         "decrypt": lambda text, key: rail_fence_cipher(text, int(key), decrypt=True),
     },
+    "aes": {
+        "needs_key": True,
+        "encrypt": lambda text, key: moderncrypto.aes_encrypt(key, text),
+        "decrypt": lambda text, key: moderncrypto.aes_decrypt(key, text),
+    },
+    "rsa": {
+        "needs_key": False,
+        "encrypt": None,
+        "decrypt": None,
+    },
 }
 
 
-def run_cipher(algo: str, text: str, key: str, key2: str, mode: str):
+def run_cipher(
+    algo: str,
+    text: str,
+    key: str,
+    key2: str,
+    mode: str,
+    pub_key_file: Optional[Path] = None,
+    private_key_file: Optional[Path] = None,
+    key_password: str = "",
+):
     algo = algo.lower()
     cipher = CIPHERS.get(algo)
 
@@ -83,15 +105,33 @@ def run_cipher(algo: str, text: str, key: str, key2: str, mode: str):
         print("[bold red]Error:[/bold red] Affine cipher requires --key and --key2")
         raise typer.Exit()
 
+    if algo == "rsa":
+        if mode == "encrypt" and not pub_key_file:
+            print("[bold red]Error:[/bold red] RSA encryption requires --pub-key-file")
+            raise typer.Exit()
+        if mode == "decrypt" and not private_key_file:
+            print("[bold red]Error:[/bold red] RSA decryption requires --private-key-file")
+            raise typer.Exit()
+
     if algo == "affine":
         validate_affine_keys(key, key2)
     
     try:
+        if algo == "rsa":
+            if mode == "encrypt":
+                public_pem = pub_key_file.read_text(encoding="utf-8")
+                return moderncrypto.rsa_encrypt(public_pem, text)
+            private_pem = private_key_file.read_text(encoding="utf-8")
+            password_bytes = key_password.encode("utf-8") if key_password else None
+            return moderncrypto.rsa_decrypt(private_pem, text, password_bytes)
+
+        if algo == "aes":
+            return cipher[mode](text, key)
+
         if algo == "affine":
             return cipher[mode](text, key, key2)
-        else:
-            return cipher[mode](text, key) # Caesar, Vigenere, etc. only get 1 key
-    
+        return cipher[mode](text, key)
+
     except ValueError as error:
         print(f"[bold red]Error:[/bold red] {error}")
         raise typer.Exit()
@@ -393,13 +433,32 @@ def interactive():
     key = ""
     key2 = ""
 
-    if CIPHERS[algo]["needs_key"]:
+    pub_key_file = None
+    private_key_file = None
+    key_password = ""
+
+    if algo == "rsa":
+        if mode == "encrypt":
+            pub_key_file = Path(typer.prompt("Public key file path"))
+        else:
+            private_key_file = Path(typer.prompt("Private key file path"))
+            key_password = typer.prompt("Private key password (optional)", default="")
+    elif CIPHERS[algo]["needs_key"]:
         key = typer.prompt("Enter key")
 
     if algo == "affine":
         key2 = typer.prompt("Enter second key")
 
-    result = run_cipher(algo, text, key, key2, mode)
+    result = run_cipher(
+        algo,
+        text,
+        key,
+        key2,
+        mode,
+        pub_key_file=pub_key_file,
+        private_key_file=private_key_file,
+        key_password=key_password,
+    )
     print(f"[bold green]Result:[/bold green] {result}")
 
 
@@ -409,14 +468,15 @@ def interactive():
 def encrypt(
     algo: str = typer.Option(
         ...,
-        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence."
+        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence, aes, rsa."
     ),
     text: str = typer.Argument("", help="Text to encrypt. Optional if --file is used."),
     key: str = typer.Option(
         "",
-        help="Main key. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words."
+        help="Main key. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words; AES uses a base64/hex key."
     ),
     key2: str = typer.Option("", help="Second numeric key. Required only for affine."),
+    pub_key_file: Optional[Path] = typer.Option(None, "--pub-key-file", help="Public key file for RSA encrypt."),
     input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read plaintext from a file instead of TEXT."),
     output_file: Optional[Path] = typer.Option(
         None,
@@ -430,7 +490,7 @@ def encrypt(
     """
 
     text = get_input_text(text, input_file)
-    result = run_cipher(algo, text, key, key2, "encrypt")
+    result = run_cipher(algo, text, key, key2, "encrypt", pub_key_file=pub_key_file)
 
     if input_file and output_file is None:
         output_file = encrypted_file_name(input_file)
@@ -444,14 +504,16 @@ def encrypt(
 def decrypt(
     algo: str = typer.Option(
         ...,
-        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence."
+        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence, aes, rsa."
     ),
     text: str = typer.Argument("", help="Text to decrypt. Optional if --file is used."),
     key: str = typer.Option(
         "",
-        help="Main key used during encryption. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words."
+        help="Main key used during encryption. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words; AES uses a base64/hex key."
     ),
     key2: str = typer.Option("", help="Second numeric key. Required only for affine."),
+    private_key_file: Optional[Path] = typer.Option(None, "--private-key-file", help="Private key file for RSA decrypt."),
+    key_password: str = typer.Option("", "--key-password", help="Password for encrypted RSA private key files."),
     input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read ciphertext from a file instead of TEXT."),
     output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Save decrypted text to this file.")
 ):
@@ -460,8 +522,60 @@ def decrypt(
     """
 
     text = get_input_text(text, input_file)
-    result = run_cipher(algo, text, key, key2, "decrypt")
+    result = run_cipher(
+        algo,
+        text,
+        key,
+        key2,
+        "decrypt",
+        private_key_file=private_key_file,
+        key_password=key_password,
+    )
     show_output(result, output_file, "Decrypted")
+
+
+@app.command()
+def generate_key(
+    algo: str = typer.Option(..., help="Algorithm to generate key for. Choices: aes, rsa."),
+    output_dir: Optional[Path] = typer.Option(None, "--output-dir", "-o", help="Directory to save RSA key files. Defaults to current directory."),
+    key_password: str = typer.Option("", "--key-password", help="Password to encrypt RSA private key."),
+):
+    """
+    Generate a new key for AES or RSA encryption.
+    """
+
+    if algo.lower() == "aes":
+        import base64
+        import os
+
+        key_bytes = os.urandom(32)  # 256-bit
+        key_b64 = base64.b64encode(key_bytes).decode("utf-8")
+        print(f"[bold green]AES Key (base64):[/bold green] {key_b64}")
+        print("[yellow]Use this with --key for AES encrypt/decrypt.[/yellow]")
+
+    elif algo.lower() == "rsa":
+        private_key = moderncrypto.generate_rsa_private_key()
+        password_bytes = key_password.encode("utf-8") if key_password else None
+        priv_pem = moderncrypto.export_private_key(private_key, password_bytes)
+        pub_pem = moderncrypto.export_public_key(private_key.public_key())
+
+        if output_dir is None:
+            output_dir = Path.cwd()
+
+        priv_path = output_dir / "priv.pem"
+        pub_path = output_dir / "pub.pem"
+
+        priv_path.write_bytes(priv_pem)
+        pub_path.write_bytes(pub_pem)
+
+        print(f"[bold green]RSA Keys Generated:[/bold green]")
+        print(f"Private key: {priv_path}")
+        print(f"Public key: {pub_path}")
+        print("[yellow]Use --pub-key-file for encrypt, --private-key-file for decrypt.[/yellow]")
+
+    else:
+        print(f"[bold red]Error:[/bold red] Unknown algorithm '{algo}'. Use 'aes' or 'rsa'.")
+        raise typer.Exit()
 
 
 # ---------- ENTRY ----------

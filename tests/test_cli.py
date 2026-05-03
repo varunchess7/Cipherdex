@@ -1,8 +1,10 @@
+import base64
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from cipherdex.main import app
+from cipherdex.moderncrypto import export_private_key, export_public_key, generate_rsa_private_key
 
 
 runner = CliRunner()
@@ -20,6 +22,38 @@ def test_decrypt_caesar_command():
 
     assert result.exit_code == 0
     assert "Decrypted: abc" in result.output
+
+
+def test_encrypt_decrypt_aes_command():
+    key = base64.b64encode(b"0123456789abcdef0123456789abcdef").decode("utf-8")
+    result_encrypt = runner.invoke(app, ["encrypt", "--algo", "aes", "--key", key, "hello"])
+
+    assert result_encrypt.exit_code == 0
+    assert "Encrypted:" in result_encrypt.output
+    ciphertext = result_encrypt.output.strip().split("Encrypted: ", 1)[1]
+
+    result_decrypt = runner.invoke(app, ["decrypt", "--algo", "aes", "--key", key, ciphertext])
+    assert result_decrypt.exit_code == 0
+    assert "Decrypted: hello" in result_decrypt.output
+
+
+def test_encrypt_decrypt_rsa_command(tmp_path):
+    private_key = generate_rsa_private_key()
+    private_pem = export_private_key(private_key).decode("utf-8")
+    public_pem = export_public_key(private_key.public_key()).decode("utf-8")
+
+    pub_path = tmp_path / "pub.pem"
+    priv_path = tmp_path / "priv.pem"
+    pub_path.write_text(public_pem, encoding="utf-8")
+    priv_path.write_text(private_pem, encoding="utf-8")
+
+    result_encrypt = runner.invoke(app, ["encrypt", "--algo", "rsa", "--pub-key-file", str(pub_path), "hello"])
+    assert result_encrypt.exit_code == 0
+    ciphertext = result_encrypt.output.strip().split("Encrypted: ", 1)[1]
+
+    result_decrypt = runner.invoke(app, ["decrypt", "--algo", "rsa", "--private-key-file", str(priv_path), ciphertext])
+    assert result_decrypt.exit_code == 0
+    assert "Decrypted: hello" in result_decrypt.output
 
 
 def test_affine_command_rejects_bad_key():
@@ -92,3 +126,19 @@ def test_detect_file_shows_cipher_detection():
         assert "Signals" in result.output
     finally:
         input_file.unlink(missing_ok=True)
+
+
+def test_generate_aes_key():
+    result = runner.invoke(app, ["generate-key", "--algo", "aes"])
+
+    assert result.exit_code == 0
+    assert "AES Key (base64):" in result.output
+
+
+def test_generate_rsa_key(tmp_path):
+    result = runner.invoke(app, ["generate-key", "--algo", "rsa", "--output-dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "RSA Keys Generated:" in result.output
+    assert (tmp_path / "priv.pem").exists()
+    assert (tmp_path / "pub.pem").exists()

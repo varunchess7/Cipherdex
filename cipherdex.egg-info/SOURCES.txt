@@ -4,6 +4,7 @@ cipherdex/__init__.py
 cipherdex/analyze_ciphers.py
 cipherdex/ciphers.py
 cipherdex/main.py
+cipherdex/moderncrypto.py
 cipherdex.egg-info/PKG-INFO
 cipherdex.egg-info/SOURCES.txt
 cipherdex.egg-info/dependency_links.txt
