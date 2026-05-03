@@ -1,6 +1,6 @@
 [project]
 name = "cipherdex"
-version = "0.1.2"
+version = "0.1.3"
 description = "A CLI tool for encryption, decryption, and cryptanalysis of classical ciphers"
 authors = [
     {name = "Varun"}

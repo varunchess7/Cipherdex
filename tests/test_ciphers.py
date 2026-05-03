@@ -12,7 +12,9 @@ from cipherdex.ciphers import (
 )
 from cipherdex.moderncrypto import (
     aes_decrypt,
+    aes_decrypt_password,
     aes_encrypt,
+    aes_encrypt_password,
     export_private_key,
     export_public_key,
     generate_rsa_private_key,
@@ -84,6 +86,14 @@ def test_aes_encrypts_and_decrypts():
 
     assert encrypted != "hello world"
     assert aes_decrypt(key, encrypted) == "hello world"
+
+
+def test_aes_pbkdf2_encrypts_and_decrypts():
+    password = "testpassword"
+    encrypted = aes_encrypt_password(password, "hello world")
+
+    assert encrypted != "hello world"
+    assert aes_decrypt_password(password, encrypted) == "hello world"
 
 
 def test_rsa_encrypts_and_decrypts():

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: cipherdex
-Version: 0.1.2
+Version: 0.1.3
 Summary: A CLI tool for encryption, decryption, and cryptanalysis of classical ciphers
 Author: Varun
 Requires-Python: >=3.8
@@ -44,6 +44,13 @@ cipherdex decrypt --algo caesar "khoor zruog" --key 3
 ```bash
 cipherdex encrypt --algo aes --key <BASE64_KEY> "hello world"
 cipherdex decrypt --algo aes --key <BASE64_KEY> <BASE64_CIPHERTEXT>
+```
+
+###  AES-Password encrypt/decrypt (password-based)
+
+```bash
+cipherdex encrypt --algo aes-password --password "mypassword" "hello world"
+cipherdex decrypt --algo aes-password --password "mypassword" <BASE64_CIPHERTEXT>
 ```
 
 ###  RSA encrypt/decrypt

@@ -22,6 +22,7 @@ app = typer.Typer(
         "`analyze --file PATH` analyzes a file. "
         "`generate-key --algo aes` generates an AES key. "
         "`generate-key --algo rsa` generates RSA key pair. "
+        "`encrypt --algo aes-password --password mypass \"text\"` encrypts with password. "
         "**Examples:** "
         "`cipherdex encrypt --algo caesar --key 3 \"hello\"`; "
         "`cipherdex encrypt --algo caesar --key 3 --file message.txt`; "
@@ -72,6 +73,11 @@ CIPHERS = {
         "encrypt": lambda text, key: moderncrypto.aes_encrypt(key, text),
         "decrypt": lambda text, key: moderncrypto.aes_decrypt(key, text),
     },
+    "aes-password": {
+        "needs_key": False,
+        "encrypt": lambda text, password: moderncrypto.aes_encrypt_password(password, text),
+        "decrypt": lambda text, password: moderncrypto.aes_decrypt_password(password, text),
+    },
     "rsa": {
         "needs_key": False,
         "encrypt": None,
@@ -89,6 +95,7 @@ def run_cipher(
     pub_key_file: Optional[Path] = None,
     private_key_file: Optional[Path] = None,
     key_password: str = "",
+    password: str = "",
 ):
     algo = algo.lower()
     cipher = CIPHERS.get(algo)
@@ -113,6 +120,10 @@ def run_cipher(
             print("[bold red]Error:[/bold red] RSA decryption requires --private-key-file")
             raise typer.Exit()
 
+    if algo == "aes-password" and not password:
+        print("[bold red]Error:[/bold red] AES-Password requires --password")
+        raise typer.Exit()
+
     if algo == "affine":
         validate_affine_keys(key, key2)
     
@@ -127,6 +138,9 @@ def run_cipher(
 
         if algo == "aes":
             return cipher[mode](text, key)
+
+        if algo == "aes-password":
+            return cipher[mode](text, password)
 
         if algo == "affine":
             return cipher[mode](text, key, key2)
@@ -436,6 +450,7 @@ def interactive():
     pub_key_file = None
     private_key_file = None
     key_password = ""
+    password = ""
 
     if algo == "rsa":
         if mode == "encrypt":
@@ -443,6 +458,8 @@ def interactive():
         else:
             private_key_file = Path(typer.prompt("Private key file path"))
             key_password = typer.prompt("Private key password (optional)", default="")
+    elif algo == "aes-password":
+        password = typer.prompt("Enter password")
     elif CIPHERS[algo]["needs_key"]:
         key = typer.prompt("Enter key")
 
@@ -458,6 +475,7 @@ def interactive():
         pub_key_file=pub_key_file,
         private_key_file=private_key_file,
         key_password=key_password,
+        password=password,
     )
     print(f"[bold green]Result:[/bold green] {result}")
 
@@ -468,7 +486,7 @@ def interactive():
 def encrypt(
     algo: str = typer.Option(
         ...,
-        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence, aes, rsa."
+        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence, aes, aes-password, rsa."
     ),
     text: str = typer.Argument("", help="Text to encrypt. Optional if --file is used."),
     key: str = typer.Option(
@@ -476,6 +494,7 @@ def encrypt(
         help="Main key. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words; AES uses a base64/hex key."
     ),
     key2: str = typer.Option("", help="Second numeric key. Required only for affine."),
+    password: str = typer.Option("", help="Password for AES-Password encryption."),
     pub_key_file: Optional[Path] = typer.Option(None, "--pub-key-file", help="Public key file for RSA encrypt."),
     input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read plaintext from a file instead of TEXT."),
     output_file: Optional[Path] = typer.Option(
@@ -490,7 +509,7 @@ def encrypt(
     """
 
     text = get_input_text(text, input_file)
-    result = run_cipher(algo, text, key, key2, "encrypt", pub_key_file=pub_key_file)
+    result = run_cipher(algo, text, key, key2, "encrypt", pub_key_file=pub_key_file, password=password)
 
     if input_file and output_file is None:
         output_file = encrypted_file_name(input_file)
@@ -504,7 +523,7 @@ def encrypt(
 def decrypt(
     algo: str = typer.Option(
         ...,
-        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence, aes, rsa."
+        help="Cipher to use. Choices: caesar, rot13, atbash, vigenere, affine, playfair, railfence, aes, aes-password, rsa."
     ),
     text: str = typer.Argument("", help="Text to decrypt. Optional if --file is used."),
     key: str = typer.Option(
@@ -512,6 +531,7 @@ def decrypt(
         help="Main key used during encryption. Caesar/Rail Fence/Affine use numbers; Vigenere/Playfair use words; AES uses a base64/hex key."
     ),
     key2: str = typer.Option("", help="Second numeric key. Required only for affine."),
+    password: str = typer.Option("", help="Password for AES-Password decryption."),
     private_key_file: Optional[Path] = typer.Option(None, "--private-key-file", help="Private key file for RSA decrypt."),
     key_password: str = typer.Option("", "--key-password", help="Password for encrypted RSA private key files."),
     input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read ciphertext from a file instead of TEXT."),
@@ -530,6 +550,7 @@ def decrypt(
         "decrypt",
         private_key_file=private_key_file,
         key_password=key_password,
+        password=password,
     )
     show_output(result, output_file, "Decrypted")
 

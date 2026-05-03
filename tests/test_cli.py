@@ -37,6 +37,19 @@ def test_encrypt_decrypt_aes_command():
     assert "Decrypted: hello" in result_decrypt.output
 
 
+def test_encrypt_decrypt_aes_pbkdf2_command():
+    password = "testpassword"
+    result_encrypt = runner.invoke(app, ["encrypt", "--algo", "aes-password", "--password", password, "hello"])
+
+    assert result_encrypt.exit_code == 0
+    assert "Encrypted:" in result_encrypt.output
+    ciphertext = result_encrypt.output.strip().split("Encrypted: ", 1)[1]
+
+    result_decrypt = runner.invoke(app, ["decrypt", "--algo", "aes-password", "--password", password, ciphertext])
+    assert result_decrypt.exit_code == 0
+    assert "Decrypted: hello" in result_decrypt.output
+
+
 def test_encrypt_decrypt_rsa_command(tmp_path):
     private_key = generate_rsa_private_key()
     private_pem = export_private_key(private_key).decode("utf-8")

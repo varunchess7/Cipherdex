@@ -35,6 +35,13 @@ cipherdex encrypt --algo aes --key <BASE64_KEY> "hello world"
 cipherdex decrypt --algo aes --key <BASE64_KEY> <BASE64_CIPHERTEXT>
 ```
 
+###  AES-Password encrypt/decrypt (password-based)
+
+```bash
+cipherdex encrypt --algo aes-password --password "mypassword" "hello world"
+cipherdex decrypt --algo aes-password --password "mypassword" <BASE64_CIPHERTEXT>
+```
+
 ###  RSA encrypt/decrypt
 
 ```bash

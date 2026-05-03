@@ -6,6 +6,7 @@ from typing import Optional
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 
 def generate_rsa_private_key(key_size: int = 2048) -> rsa.RSAPrivateKey:
@@ -102,5 +103,39 @@ def aes_decrypt(key: str, ciphertext_b64: str) -> str:
     nonce = data[:12]
     ciphertext = data[12:]
     aesgcm = AESGCM(key_bytes)
+    plaintext = aesgcm.decrypt(nonce, ciphertext, associated_data=None)
+    return plaintext.decode("utf-8")
+
+
+def derive_key(password: str, salt: bytes) -> bytes:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    return kdf.derive(password.encode("utf-8"))
+
+
+def aes_encrypt_password(password: str, plaintext: str) -> str:
+    salt = os.urandom(16)
+    key = derive_key(password, salt)
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), associated_data=None)
+    # Format: salt (16) + nonce (12) + ciphertext
+    data = salt + nonce + ciphertext
+    return base64.b64encode(data).decode("utf-8")
+
+
+def aes_decrypt_password(password: str, token_b64: str) -> str:
+    data = base64.b64decode(token_b64)
+    if len(data) < 28:
+        raise ValueError("Invalid password-based AES ciphertext")
+    salt = data[:16]
+    nonce = data[16:28]
+    ciphertext = data[28:]
+    key = derive_key(password, salt)
+    aesgcm = AESGCM(key)
     plaintext = aesgcm.decrypt(nonce, ciphertext, associated_data=None)
     return plaintext.decode("utf-8")
