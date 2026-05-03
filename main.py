@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+from math import gcd
 
 import typer
 from rich import print
@@ -66,6 +67,9 @@ def run_cipher(algo: str, text: str, key: str, key2: str, mode: str):
     if algo == "affine" and not key2:
         print("[bold red]Error:[/bold red] Affine cipher requires --key and --key2")
         raise typer.Exit()
+
+    if algo == "affine":
+        validate_affine_keys(key, key2)
     
     try:
         if algo == "affine":
@@ -75,6 +79,20 @@ def run_cipher(algo: str, text: str, key: str, key2: str, mode: str):
     
     except ValueError as error:
         print(f"[bold red]Error:[/bold red] {error}")
+        raise typer.Exit()
+
+
+def validate_affine_keys(key: str, key2: str):
+    try:
+        a = int(key)
+        int(key2)
+    except ValueError:
+        print("[bold red]Error:[/bold red] Affine keys must be numbers")
+        raise typer.Exit()
+
+    if gcd(a, 26) != 1:
+        print("[bold red]Error:[/bold red] Affine --key must be coprime with 26")
+        print("Valid --key values include: 1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25")
         raise typer.Exit()
 
 
@@ -174,11 +192,13 @@ def bruteforce(
 
 @app.command()
 def analyze(
-    text: str = typer.Argument(..., help="Text to analyze for letter frequency and cipher clues.")
+    text: str = typer.Argument("", help="Text to analyze. Optional if --file is used."),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read text to analyze from a file.")
 ):
     """
-    Show letter frequency, Index of Coincidence, and a simple cipher guess.
+    Analyze typed text or a file for letter frequency, Index of Coincidence, and cipher clues.
     """
+    text = get_input_text(text, input_file)
     freq = Counter(char.lower() for char in text if char.isalpha())
     total = sum(freq.values())
 
