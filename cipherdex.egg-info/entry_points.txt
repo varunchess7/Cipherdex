@@ -1,0 +1,2 @@
+[console_scripts]
+cipherdex = cipherdex.main:app

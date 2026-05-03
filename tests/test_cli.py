@@ -2,7 +2,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from main import app
+from cipherdex.main import app
 
 
 runner = CliRunner()

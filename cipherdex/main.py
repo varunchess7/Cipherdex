@@ -5,8 +5,8 @@ from math import gcd
 import typer
 from rich import print
 from rich.table import Table
-from ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
-from analyze_ciphers import cipherinfo
+from cipherdex.ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
+from cipherdex.analyze_ciphers import cipherinfo
 from collections import Counter
 
 app = typer.Typer(
@@ -20,10 +20,10 @@ app = typer.Typer(
         "`--output PATH` saves to a file. "
         "`analyze --file PATH` analyzes a file. "
         "**Examples:** "
-        "`python main.py encrypt --algo caesar --key 3 \"hello\"`; "
-        "`python main.py encrypt --algo caesar --key 3 --file message.txt`; "
-        "`python main.py analyze --file \"Encrypted message.txt\"`; "
-        "`python main.py decrypt --algo affine --key 5 --key2 8 \"rclla\"`."
+        "`cipherdex encrypt --algo caesar --key 3 \"hello\"`; "
+        "`cipherdex encrypt --algo caesar --key 3 --file message.txt`; "
+        "`cipherdex analyze --file \"Encrypted message.txt\"`; "
+        "`cipherdex decrypt --algo affine --key 5 --key2 8 \"rclla\"`."
     ),
     rich_markup_mode="markdown",
 )

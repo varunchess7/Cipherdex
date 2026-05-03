@@ -1,6 +1,6 @@
 import pytest
 
-from ciphers import (
+from cipherdex.ciphers import (
     affine_cipher,
     atbash_cipher,
     caesar_cipher,
