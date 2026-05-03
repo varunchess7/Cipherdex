@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 cipherdex/__init__.py
 cipherdex/analyze_ciphers.py

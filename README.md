@@ -1,13 +1,3 @@
-Metadata-Version: 2.4
-Name: cipherdex
-Version: 0.1.1
-Summary: A CLI tool for encryption, decryption, and cryptanalysis of classical ciphers
-Author: Varun
-Requires-Python: >=3.8
-Description-Content-Type: text/markdown
-Requires-Dist: typer
-Requires-Dist: rich
-
 #  CipherDex
 
 **CipherDex** is a powerful command-line toolkit for encryption, decryption, and cryptanalysis of classical ciphers.
