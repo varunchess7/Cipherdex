@@ -70,3 +70,25 @@ def test_analyze_file_shows_index_of_coincidence():
         assert "Index of Coincidence" in result.output
     finally:
         input_file.unlink(missing_ok=True)
+
+
+def test_detect_shows_cipher_detection():
+    result = runner.invoke(app, ["detect", "khoor zruog"])
+
+    assert result.exit_code == 0
+    assert "Cipher Detection" in result.output
+    assert "Signals" in result.output
+
+
+def test_detect_file_shows_cipher_detection():
+    input_file = Path("test_detect_message.txt")
+    input_file.write_text("khoor zruog", encoding="utf-8")
+
+    try:
+        result = runner.invoke(app, ["detect", "--file", str(input_file)])
+
+        assert result.exit_code == 0
+        assert "Cipher Detection" in result.output
+        assert "Signals" in result.output
+    finally:
+        input_file.unlink(missing_ok=True)

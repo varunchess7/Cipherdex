@@ -10,7 +10,22 @@ from analyze_ciphers import cipherinfo
 from collections import Counter
 
 app = typer.Typer(
-    help="Encrypt, decrypt, inspect, and analyze text with classic cipher algorithms."
+    help="Encrypt, decrypt, inspect, and analyze text with classic cipher algorithms.",
+    epilog=(
+        "**Common command options:** "
+        "`encrypt/decrypt --algo TEXT` chooses the cipher. "
+        "`--key TEXT` is the main key. "
+        "`--key2 TEXT` is for affine. "
+        "`--file PATH` reads from a file. "
+        "`--output PATH` saves to a file. "
+        "`analyze --file PATH` analyzes a file. "
+        "**Examples:** "
+        "`python main.py encrypt --algo caesar --key 3 \"hello\"`; "
+        "`python main.py encrypt --algo caesar --key 3 --file message.txt`; "
+        "`python main.py analyze --file \"Encrypted message.txt\"`; "
+        "`python main.py decrypt --algo affine --key 5 --key2 8 \"rclla\"`."
+    ),
+    rich_markup_mode="markdown",
 )
 
 CIPHERS = {
@@ -153,6 +168,90 @@ def guess_cipher_from_ioc(ioc: float, total: int):
     return "Looks very flat/random. It may be strongly encrypted, random text, or not English."
 
 
+def english_score(text: str):
+    common_words = [
+        "the", "and", "you", "that", "have", "for", "not", "with", "this",
+        "hello", "world", "text", "message", "english",
+    ]
+    lowered = text.lower()
+    score = sum(lowered.count(word) for word in common_words) * 10
+    score += sum(1 for char in lowered if char in "etaoinshrdlu")
+    return score
+
+
+def detect_cipher(text: str):
+    letters = [char.lower() for char in text if char.isalpha()]
+    total = len(letters)
+
+    if total == 0:
+        print("[bold red]Error:[/bold red] Text must contain at least one letter")
+        raise typer.Exit()
+
+    freq = Counter(letters)
+    ioc = index_of_coincidence(freq, total)
+    unique_letters = len(freq)
+    repeated_pairs = sum(
+        1
+        for index in range(len(letters) - 1)
+        if letters[index] == letters[index + 1]
+    )
+
+    guesses = []
+
+    if total < 20:
+        guesses.append(("Unknown / too short", 35, "Not enough letters for a strong pattern match."))
+    elif ioc >= 0.055:
+        guesses.append((
+            "English text or substitution/transposition cipher",
+            70,
+            "High IoC means normal English letter frequency is still visible.",
+        ))
+        guesses.append((
+            "Caesar / Atbash / Affine / Rail Fence",
+            55,
+            "These ciphers often preserve English-like frequency patterns.",
+        ))
+    elif ioc >= 0.035:
+        guesses.append((
+            "Vigenere or Playfair",
+            60,
+            "IoC is flatter than normal English, suggesting frequency is being spread out.",
+        ))
+    else:
+        guesses.append((
+            "Random text or stronger encryption",
+            65,
+            "Very low IoC means letter frequencies are unusually flat.",
+        ))
+
+    best_shift = max(range(26), key=lambda shift: english_score(caesar_cipher(text, -shift)))
+    best_caesar = caesar_cipher(text, -best_shift)
+    caesar_margin = 8 if total < 20 else 20
+    if best_shift and english_score(best_caesar) >= english_score(text) + caesar_margin:
+        guesses.insert(0, (
+            "Caesar cipher",
+            75,
+            f"Caesar brute-force found readable-looking text with key {best_shift}: {best_caesar[:60]}",
+        ))
+
+    if unique_letters <= 5 and total >= 20:
+        guesses.append((
+            "Limited alphabet / encoded text",
+            50,
+            "Only a few different letters appear, which is unusual for normal English.",
+        ))
+
+    if repeated_pairs == 0 and total >= 40 and ioc < 0.055:
+        guesses.append((
+            "Playfair",
+            45,
+            "No repeated adjacent letters can be a clue, but this is weak by itself.",
+        ))
+
+    guesses = sorted(guesses, key=lambda guess: guess[1], reverse=True)
+    return ioc, total, unique_letters, guesses
+
+
 @app.command()
 def list():
     """
@@ -233,6 +332,37 @@ def analyze(
     summary.add_row("Guess", guess)
 
     print(summary)
+
+
+@app.command()
+def detect(
+    text: str = typer.Argument("", help="Text to detect. Optional if --file is used."),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read text to detect from a file.")
+):
+    """
+    Guess which cipher may have produced the text.
+    """
+    text = get_input_text(text, input_file)
+    ioc, total, unique_letters, guesses = detect_cipher(text)
+
+    table = Table(title="Cipher Detection")
+    table.add_column("Guess", style="cyan")
+    table.add_column("Confidence", style="green", justify="right")
+    table.add_column("Reason", style="yellow")
+
+    for name, confidence, reason in guesses:
+        table.add_row(name, f"{confidence}%", reason)
+
+    print(table)
+
+    details = Table(title="Signals")
+    details.add_column("Metric", style="cyan")
+    details.add_column("Value", style="green")
+    details.add_row("Letters analyzed", str(total))
+    details.add_row("Unique letters", str(unique_letters))
+    details.add_row("Index of Coincidence", f"{ioc:.4f}")
+
+    print(details)
 
 
 @app.command()
