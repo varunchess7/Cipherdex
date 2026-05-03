@@ -1,4 +1,1 @@
-analyze_ciphers
 cipherdex
-ciphers
-main

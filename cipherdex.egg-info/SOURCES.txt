@@ -1,5 +1,4 @@
 pyproject.toml
-setup.py
 cipherdex/__init__.py
 cipherdex/analyze_ciphers.py
 cipherdex/ciphers.py
