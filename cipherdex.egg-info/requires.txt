@@ -1,3 +1,5 @@
 typer
 rich
 cryptography
+bcrypt
+argon2-cffi

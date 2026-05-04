@@ -1,6 +1,6 @@
 [project]
 name = "cipherdex"
-version = "0.1.3"
+version = "0.2.0"
 description = "A CLI tool for encryption, decryption, and cryptanalysis of classical ciphers"
 authors = [
     {name = "Varun"}
@@ -10,7 +10,9 @@ requires-python = ">=3.8"
 dependencies = [
     "typer",
     "rich",
-    "cryptography"
+    "cryptography",
+    "bcrypt",
+    "argon2-cffi"
 ]
 
 [project.scripts]

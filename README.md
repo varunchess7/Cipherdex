@@ -56,6 +56,15 @@ cipherdex generate-key --algo aes
 cipherdex generate-key --algo rsa
 ```
 
+###  Hash data
+
+```bash
+cipherdex hash --algo sha256 "hello world"
+cipherdex hash --algo sha256 --file data.txt
+cipherdex hash --algo bcrypt "password"
+cipherdex hash --algo argon2 "password"
+```
+
 ###  Analyze text
 
 ```bash

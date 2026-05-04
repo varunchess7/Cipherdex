@@ -1,8 +1,10 @@
+LICENSE
 README.md
 pyproject.toml
 cipherdex/__init__.py
 cipherdex/analyze_ciphers.py
 cipherdex/ciphers.py
+cipherdex/hashing.py
 cipherdex/main.py
 cipherdex/moderncrypto.py
 cipherdex.egg-info/PKG-INFO

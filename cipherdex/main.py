@@ -8,6 +8,7 @@ from rich.table import Table
 from cipherdex.ciphers import caesar_cipher, atbash_cipher, rot13_cipher, vigenere_cipher, affine_cipher, playfair_cipher, rail_fence_cipher
 from cipherdex.analyze_ciphers import cipherinfo
 from cipherdex import moderncrypto
+from cipherdex import hashing
 from collections import Counter
 
 app = typer.Typer(
@@ -23,6 +24,7 @@ app = typer.Typer(
         "`generate-key --algo aes` generates an AES key. "
         "`generate-key --algo rsa` generates RSA key pair. "
         "`encrypt --algo aes-password --password mypass \"text\"` encrypts with password. "
+        "`hash --algo sha256 \"text\"` computes a hash. "
         "**Examples:** "
         "`cipherdex encrypt --algo caesar --key 3 \"hello\"`; "
         "`cipherdex encrypt --algo caesar --key 3 --file message.txt`; "
@@ -597,6 +599,43 @@ def generate_key(
     else:
         print(f"[bold red]Error:[/bold red] Unknown algorithm '{algo}'. Use 'aes' or 'rsa'.")
         raise typer.Exit()
+
+
+@app.command()
+def hash(
+    algo: str = typer.Option(..., help="Hash algorithm. Choices: sha256, sha512, bcrypt, argon2."),
+    text: str = typer.Argument("", help="Text to hash. Optional if --file is used."),
+    input_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Read data from a file instead of TEXT."),
+):
+    """
+    Compute a cryptographic hash of the input text or file.
+    """
+
+    if input_file:
+        data = input_file.read_bytes()
+        input_str = input_file.read_text(encoding="utf-8")
+    else:
+        if not text:
+            print("[bold red]Error:[/bold red] Provide text or use --file")
+            raise typer.Exit()
+        data = text.encode("utf-8")
+        input_str = text
+
+    algo = algo.lower()
+
+    if algo == "sha256":
+        result = hashing.sha256_hash(data)
+    elif algo == "sha512":
+        result = hashing.sha512_hash(data)
+    elif algo == "bcrypt":
+        result = hashing.bcrypt_hash(input_str)
+    elif algo == "argon2":
+        result = hashing.argon2_hash(input_str)
+    else:
+        print(f"[bold red]Error:[/bold red] Unknown hash algorithm '{algo}'")
+        raise typer.Exit()
+
+    print(f"[bold green]Hash ({algo}):[/bold green] {result}")
 
 
 # ---------- ENTRY ----------

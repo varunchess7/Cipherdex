@@ -155,3 +155,34 @@ def test_generate_rsa_key(tmp_path):
     assert "RSA Keys Generated:" in result.output
     assert (tmp_path / "priv.pem").exists()
     assert (tmp_path / "pub.pem").exists()
+
+
+def test_hash_sha256():
+    result = runner.invoke(app, ["hash", "--algo", "sha256", "hello"])
+
+    assert result.exit_code == 0
+    assert "Hash (sha256):" in result.output
+    assert "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" in result.output
+
+
+def test_hash_sha512():
+    result = runner.invoke(app, ["hash", "--algo", "sha512", "hello"])
+
+    assert result.exit_code == 0
+    assert "Hash (sha512):" in result.output
+
+
+def test_hash_bcrypt():
+    result = runner.invoke(app, ["hash", "--algo", "bcrypt", "password"])
+
+    assert result.exit_code == 0
+    assert "Hash (bcrypt):" in result.output
+    assert result.output.startswith("Hash (bcrypt): $2b$")
+
+
+def test_hash_argon2():
+    result = runner.invoke(app, ["hash", "--algo", "argon2", "password"])
+
+    assert result.exit_code == 0
+    assert "Hash (argon2):" in result.output
+    assert "$argon2" in result.output
